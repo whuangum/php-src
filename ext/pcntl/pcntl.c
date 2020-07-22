@@ -40,6 +40,8 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#elif HAVE_SYS_TIME_H
+#include <sys/time.h>
 #endif
 
 #include <errno.h>
@@ -147,6 +149,12 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_alarm, 0, 0, 1)
 	ZEND_ARG_INFO(0, seconds)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getitimer, 0, 0, 3)
+	ZEND_ARG_INFO(0, which)
+	ZEND_ARG_INFO(1, it_interval)
+	ZEND_ARG_INFO(1, it_value)
+ZEND_END_ARG_INFO()
+
 #ifdef HAVE_GETPRIORITY
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getpriority, 0, 0, 0)
 	ZEND_ARG_INFO(0, pid)
@@ -195,6 +203,7 @@ static const zend_function_entry pcntl_functions[] = {
 	PHP_FE(pcntl_get_last_error,	arginfo_pcntl_void)
 	PHP_FALIAS(pcntl_errno, pcntl_get_last_error,	NULL)
 	PHP_FE(pcntl_strerror,		arginfo_pcntl_strerror)
+	PHP_FE(pcntl_getitimer, arginfo_pcntl_getitimer)
 #ifdef HAVE_GETPRIORITY
 	PHP_FE(pcntl_getpriority,	arginfo_pcntl_getpriority)
 #endif
@@ -577,6 +586,19 @@ static void php_pcntl_register_errno_constants(INIT_FUNC_ARGS)
 #endif
 }
 
+static void php_pcntl_register_itimer_constants(INIT_FUNC_ARGS)
+{
+#ifdef ITIMER_REAL
+	REGISTER_LONG_CONSTANT("ITIMER_REAL", (zend_long) ITIMER_REAL, CONST_CS | CONST_PERSISTENT);
+#endif
+#ifdef ITIMER_VIRTUAL
+	REGISTER_LONG_CONSTANT("ITIMER_VIRTUAL", (zend_long) ITIMER_VIRTUAL, CONST_CS | CONST_PERSISTENT);
+#endif
+#ifdef ITIMER_PROF
+	REGISTER_LONG_CONSTANT("ITIMER_PROF", (zend_long) ITIMER_PROF, CONST_CS | CONST_PERSISTENT);
+#endif
+}
+
 static PHP_GINIT_FUNCTION(pcntl)
 {
 #if defined(COMPILE_DL_PCNTL) && defined(ZTS)
@@ -598,6 +620,7 @@ PHP_MINIT_FUNCTION(pcntl)
 {
 	php_register_signal_constants(INIT_FUNC_ARGS_PASSTHRU);
 	php_pcntl_register_errno_constants(INIT_FUNC_ARGS_PASSTHRU);
+	php_pcntl_register_itimer_constants(INIT_FUNC_ARGS_PASSTHRU);
 	orig_interrupt_function = zend_interrupt_function;
 	zend_interrupt_function = pcntl_interrupt_function;
 
@@ -662,6 +685,35 @@ PHP_FUNCTION(pcntl_alarm)
 		return;
 
 	RETURN_LONG ((zend_long) alarm(seconds));
+}
+/* }}} */
+
+/* {{{ proto int pcntl_getitimer(int which, double &it_interval, double &it_value)
+   getitimer()*/
+PHP_FUNCTION(pcntl_getitimer)
+{
+	zend_long which;
+	zval *it_interval, *it_value;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "lzz", &which, &it_interval, &it_value) == FAILURE)
+		return;
+
+	struct itimerval curr_value;
+	int result = getitimer(which, &curr_value);
+
+	if (result == -1) {
+		PCNTL_G(last_error) = errno;
+		php_error_docref(NULL, E_WARNING, "Error %d", errno);
+	} else {
+		double _it_interval = curr_value.it_interval.tv_sec +
+				(double) curr_value.it_interval.tv_usec / 1E6;
+		double _it_value = curr_value.it_value.tv_sec +
+				(double) curr_value.it_value.tv_usec / 1E6;
+		ZEND_TRY_ASSIGN_REF_DOUBLE(it_interval, _it_interval);
+		ZEND_TRY_ASSIGN_REF_DOUBLE(it_value, _it_value);
+	}
+
+	RETURN_LONG((zend_long) result);
 }
 /* }}} */
 
