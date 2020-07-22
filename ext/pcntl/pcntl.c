@@ -155,6 +155,14 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getitimer, 0, 0, 3)
 	ZEND_ARG_INFO(1, it_value)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_setitimer, 0, 0, 3)
+	ZEND_ARG_INFO(0, which)
+	ZEND_ARG_INFO(0, new_it_interval)
+	ZEND_ARG_INFO(0, new_it_value)
+	ZEND_ARG_INFO(1, old_it_interval)
+	ZEND_ARG_INFO(1, old_it_value)
+ZEND_END_ARG_INFO()
+
 #ifdef HAVE_GETPRIORITY
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getpriority, 0, 0, 0)
 	ZEND_ARG_INFO(0, pid)
@@ -204,6 +212,7 @@ static const zend_function_entry pcntl_functions[] = {
 	PHP_FALIAS(pcntl_errno, pcntl_get_last_error,	NULL)
 	PHP_FE(pcntl_strerror,		arginfo_pcntl_strerror)
 	PHP_FE(pcntl_getitimer, arginfo_pcntl_getitimer)
+	PHP_FE(pcntl_setitimer, arginfo_pcntl_setitimer)
 #ifdef HAVE_GETPRIORITY
 	PHP_FE(pcntl_getpriority,	arginfo_pcntl_getpriority)
 #endif
@@ -711,6 +720,55 @@ PHP_FUNCTION(pcntl_getitimer)
 				(double) curr_value.it_value.tv_usec / 1E6;
 		ZEND_TRY_ASSIGN_REF_DOUBLE(it_interval, _it_interval);
 		ZEND_TRY_ASSIGN_REF_DOUBLE(it_value, _it_value);
+	}
+
+	RETURN_LONG((zend_long) result);
+}
+/* }}} */
+
+/* {{{ proto int pcntl_setitimer(int which, double new_it_interval, double new_it_value [, double &old_it_interval [, double &old_it_value]])
+   setitimer()*/
+PHP_FUNCTION(pcntl_setitimer)
+{
+	zend_long which;
+	double new_it_interval, new_it_value;
+	zval *old_it_interval = NULL, *old_it_value = NULL;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "ldd|zz",
+			&which, &new_it_interval, &new_it_value, &old_it_interval, &old_it_value) == FAILURE)
+		return;
+
+	int get_old_val = (old_it_interval != NULL) && (old_it_value != NULL);
+	struct itimerval new_value, old_value;
+	int result = -1;
+
+	// fill in new_value
+	double integral = 0.0, fractional = 0.0;
+	fractional = modf(new_it_interval, &integral);
+	new_value.it_interval.tv_sec = integral;
+	fractional = modf(fractional * 1E6, &integral);
+	new_value.it_interval.tv_usec = integral;
+	fractional = modf(new_it_value, &integral);
+	new_value.it_value.tv_sec = integral;
+	fractional = modf(fractional * 1E6, &integral);
+	new_value.it_value.tv_usec = integral;
+
+	if (get_old_val) {
+		result = setitimer(which, &new_value, &old_value);
+	} else {
+		result = setitimer(which, &new_value, NULL);
+	}
+
+	if (result == -1) {
+		PCNTL_G(last_error) = errno;
+		php_error_docref(NULL, E_WARNING, "Error %d", errno);
+	} else if (get_old_val) {
+		double _it_interval = old_value.it_interval.tv_sec +
+				(double) old_value.it_interval.tv_usec / 1E6;
+		double _it_value = old_value.it_value.tv_sec +
+				   (double) old_value.it_value.tv_usec / 1E6;
+		ZEND_TRY_ASSIGN_REF_DOUBLE(old_it_interval, _it_interval);
+		ZEND_TRY_ASSIGN_REF_DOUBLE(old_it_value, _it_value);
 	}
 
 	RETURN_LONG((zend_long) result);
