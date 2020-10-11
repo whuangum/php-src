@@ -163,6 +163,10 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_setitimer, 0, 0, 3)
 	ZEND_ARG_INFO(1, old_it_value)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_process_time, 0, 0, 1)
+	ZEND_ARG_INFO(1, time)
+ZEND_END_ARG_INFO()
+
 #ifdef HAVE_GETPRIORITY
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getpriority, 0, 0, 0)
 	ZEND_ARG_INFO(0, pid)
@@ -213,6 +217,7 @@ static const zend_function_entry pcntl_functions[] = {
 	PHP_FE(pcntl_strerror,		arginfo_pcntl_strerror)
 	PHP_FE(pcntl_getitimer, arginfo_pcntl_getitimer)
 	PHP_FE(pcntl_setitimer, arginfo_pcntl_setitimer)
+	PHP_FE(pcntl_process_time, arginfo_pcntl_process_time)
 #ifdef HAVE_GETPRIORITY
 	PHP_FE(pcntl_getpriority,	arginfo_pcntl_getpriority)
 #endif
@@ -766,9 +771,33 @@ PHP_FUNCTION(pcntl_setitimer)
 		double _it_interval = old_value.it_interval.tv_sec +
 				(double) old_value.it_interval.tv_usec / 1E6;
 		double _it_value = old_value.it_value.tv_sec +
-				   (double) old_value.it_value.tv_usec / 1E6;
+				(double) old_value.it_value.tv_usec / 1E6;
 		ZEND_TRY_ASSIGN_REF_DOUBLE(old_it_interval, _it_interval);
 		ZEND_TRY_ASSIGN_REF_DOUBLE(old_it_value, _it_value);
+	}
+
+	RETURN_LONG((zend_long) result);
+}
+/* }}} */
+
+/* {{{ proto int pcntl_process_time(double &time)
+   process_time()*/
+PHP_FUNCTION(pcntl_process_time)
+{
+	zval *time = NULL;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &time) == FAILURE)
+		return;
+
+	struct timespec tp;
+	int result = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tp);
+
+	if (result == -1) {
+		PCNTL_G(last_error) = errno;
+		php_error_docref(NULL, E_WARNING, "Error %d", errno);
+	} else {
+		ZEND_TRY_ASSIGN_REF_DOUBLE(time,
+			tp.tv_sec + (double) tp.tv_nsec / 1E9);
 	}
 
 	RETURN_LONG((zend_long) result);
