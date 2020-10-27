@@ -39,6 +39,7 @@ PHP_FUNCTION(pcntl_alarm);
 PHP_FUNCTION(pcntl_getitimer);
 PHP_FUNCTION(pcntl_setitimer);
 PHP_FUNCTION(pcntl_process_time);
+PHP_FUNCTION(pcntl_get_thread_id);
 PHP_FUNCTION(pcntl_fork);
 PHP_FUNCTION(pcntl_waitpid);
 PHP_FUNCTION(pcntl_wait);

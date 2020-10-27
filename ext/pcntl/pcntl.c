@@ -167,6 +167,9 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_process_time, 0, 0, 1)
 	ZEND_ARG_INFO(1, time)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_get_thread_id, 0, 0, 0)
+ZEND_END_ARG_INFO()
+
 #ifdef HAVE_GETPRIORITY
 ZEND_BEGIN_ARG_INFO_EX(arginfo_pcntl_getpriority, 0, 0, 0)
 	ZEND_ARG_INFO(0, pid)
@@ -218,6 +221,7 @@ static const zend_function_entry pcntl_functions[] = {
 	PHP_FE(pcntl_getitimer, arginfo_pcntl_getitimer)
 	PHP_FE(pcntl_setitimer, arginfo_pcntl_setitimer)
 	PHP_FE(pcntl_process_time, arginfo_pcntl_process_time)
+	PHP_FE(pcntl_get_thread_id, arginfo_pcntl_get_thread_id)
 #ifdef HAVE_GETPRIORITY
 	PHP_FE(pcntl_getpriority,	arginfo_pcntl_getpriority)
 #endif
@@ -781,7 +785,7 @@ PHP_FUNCTION(pcntl_setitimer)
 /* }}} */
 
 /* {{{ proto int pcntl_process_time(double &time)
-   process_time()*/
+   clock_gettime(CLOCK_PROCESS_CPUTIME_ID)*/
 PHP_FUNCTION(pcntl_process_time)
 {
 	zval *time = NULL;
@@ -801,6 +805,14 @@ PHP_FUNCTION(pcntl_process_time)
 	}
 
 	RETURN_LONG((zend_long) result);
+}
+/* }}} */
+
+/* {{{ proto int pcntl_get_thread_id()
+   pthread_self()*/
+PHP_FUNCTION(pcntl_get_thread_id)
+{
+	RETURN_LONG((zend_long) pthread_self());
 }
 /* }}} */
 
